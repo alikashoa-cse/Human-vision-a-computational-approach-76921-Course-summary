@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Moving Lines Experiment & Verification</title>
+    <title>Moving Lines - Fixed Engine</title>
     <style>
         * {
             margin: 0;
@@ -22,26 +22,20 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
         
-        /* Container to keep canvas centered */
         .canvas-container {
-            position: relative;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            width: 100%;
-            max-height: 80vh;
+            border: 4px solid #111;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            background-color: #000;
+            padding: 20px;
         }
 
         canvas {
             display: block;
-            max-width: 100%;
-            max-height: 100%;
         }
 
-        /* Sleek UI Toggle Button */
         .controls {
-            margin-top: 20px;
-            z-index: 10;
+            margin-top: 25px;
         }
 
         button {
@@ -50,27 +44,14 @@
             border: none;
             padding: 12px 24px;
             font-size: 14px;
-            font-weight: 600;
-            letter-spacing: 0.5px;
+            font-weight: bold;
             border-radius: 6px;
             cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
+            transition: 0.2s;
         }
 
         button:hover {
-            background-color: #e0e0e0;
-            transform: translateY(-1px);
-        }
-
-        button:active {
-            transform: translateY(1px);
-        }
-
-        button.active-mode {
-            background-color: #ff3b30;
-            color: #ffffff;
-            box-shadow: 0 4px 12px rgba(255, 59, 48, 0.3);
+            background-color: #ccc;
         }
     </style>
 </head>
@@ -81,7 +62,7 @@
     </div>
 
     <div class="controls">
-        <button id="toggleBtn">Hide Shapes (Reveal Matrix)</button>
+        <button id="toggleBtn">Show Full Grid</button>
     </div>
 
     <script>
@@ -95,99 +76,98 @@
         canvas.height = HEIGHT;
 
         let lineOffset = 0;
-        const animationSpeed = 0.7; 
-        
-        // State variable: true = show original shapes, false = fill entire background with lines
-        let showShapes = true;
+        const animationSpeed = 1.0; // The horizontal movement speed
+        let showFullGrid = false;
 
-        // 1. Create the seamless static pattern canvas
-        const patternCanvas = document.createElement('canvas');
-        const pCtx = patternCanvas.getContext('2d');
-        const pSize = 20; 
+        // 1. Create the Correct Angle (Bottom-Left to Top-Right)
+        const pCanvas = document.createElement('canvas');
+        const pCtx = pCanvas.getContext('2d');
+        const pSize = 30; // Distance between stripes
         
-        patternCanvas.width = pSize;
-        patternCanvas.height = pSize;
+        pCanvas.width = pSize;
+        pCanvas.height = pSize;
+        
+        // Ensure equal thickness between the white lines and black gaps
+        pCtx.lineWidth = 11; 
         pCtx.strokeStyle = '#ffffff';
-        pCtx.lineWidth = 3;
-        
+
+        /* Draw seamless mathematical diagonals (y = -x + c).
+          Drawing lines extending past the bounds guarantees a seamless loop.
+        */
         pCtx.beginPath();
-        pCtx.moveTo(0, 0);
-        pCtx.lineTo(pSize, pSize);
-        pCtx.moveTo(0, pSize);
-        pCtx.lineTo(pSize, pSize * 2);
-        pCtx.moveTo(-pSize, 0);
-        pCtx.lineTo(0, pSize);
+        // Line 1
+        pCtx.moveTo(-30, 30); 
+        pCtx.lineTo(30, -30);
+        // Line 2 (Core diagonal)
+        pCtx.moveTo(-30, 60); 
+        pCtx.lineTo(60, -30);
+        // Line 3
+        pCtx.moveTo(0, 60); 
+        pCtx.lineTo(60, 0);
         pCtx.stroke();
 
-        const stripePattern = ctx.createPattern(patternCanvas, 'repeat');
+        const stripePattern = ctx.createPattern(pCanvas, 'repeat');
 
-        // Toggle Button Click Handler
+        // Toggle behavior
         toggleBtn.addEventListener('click', () => {
-            showShapes = !showShapes;
-            if (showShapes) {
-                toggleBtn.textContent = "Hide Shapes (Reveal Matrix)";
-                toggleBtn.classList.remove('active-mode');
-            } else {
-                toggleBtn.textContent = "Show Shapes (Original Look)";
-                toggleBtn.classList.add('active-mode');
-            }
+            showFullGrid = !showFullGrid;
+            toggleBtn.textContent = showFullGrid ? "Show Original Shapes" : "Show Full Grid";
         });
 
-        // 2. Main Animation & Render Loop
+        // 2. Main Render Loop
         function draw() {
-            // Reset background to solid black
+            // Clear background
             ctx.fillStyle = '#000000';
             ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-            ctx.save();
-            // Shift coordinate space globally to drive line movement
-            ctx.translate(lineOffset, 0);
+            // ANIMATION MAGIC: Shift the pattern's matrix purely horizontally. 
+            // Pushing a '/' line to the right makes it visibly flow.
+            const matrix = new DOMMatrix().translate(lineOffset, 0);
+            stripePattern.setTransform(matrix);
+            
             ctx.fillStyle = stripePattern;
 
-            if (!showShapes) {
-                // VERIFICATION MODE: Fill the entire canvas screen with the exact same moving lines
-                ctx.fillRect(-pSize, 0, WIDTH + pSize * 2, HEIGHT);
+            if (showFullGrid) {
+                // Draw over the entire screen to prove the grid moves smoothly
+                ctx.fillRect(0, 0, WIDTH, HEIGHT);
             } else {
-                // NORMAL MODE: Anchor coordinates backward so shapes stand still while lines slide through
+                // The shapes now use pure, static, locked-in coordinates
                 
-                // Shape 1: Vertical rectangle on the left
+                // Shape 1: Vertical rectangle
                 ctx.beginPath();
-                ctx.rect(60 - lineOffset, 110, 50, 210);
+                ctx.rect(60, 110, 50, 210);
                 ctx.fill();
 
-                // Shape 2: The Circle
+                // Shape 2: Circle
                 ctx.beginPath();
-                ctx.arc(250 - lineOffset, 140, 50, 0, Math.PI * 2);
+                ctx.arc(250, 140, 50, 0, Math.PI * 2);
                 ctx.fill();
 
-                // Shape 3: Horizontal rectangle below circle
+                // Shape 3: Horizontal rectangle
                 ctx.beginPath();
-                ctx.rect(155 - lineOffset, 235, 215, 45);
+                ctx.rect(155, 235, 215, 45);
                 ctx.fill();
 
-                // Shape 4: The S/Z stepped block on the right
+                // Shape 4: The 'Z' block
                 ctx.beginPath();
-                ctx.moveTo(355 - lineOffset, 120); 
-                ctx.lineTo(515 - lineOffset, 120); 
-                ctx.lineTo(515 - lineOffset, 225); 
-                ctx.lineTo(645 - lineOffset, 225); 
-                ctx.lineTo(645 - lineOffset, 270); 
-                ctx.lineTo(465 - lineOffset, 270); 
-                ctx.lineTo(465 - lineOffset, 165); 
-                ctx.lineTo(355 - lineOffset, 165); 
+                ctx.moveTo(355, 120); 
+                ctx.lineTo(515, 120); 
+                ctx.lineTo(515, 225); 
+                ctx.lineTo(645, 225); 
+                ctx.lineTo(645, 270); 
+                ctx.lineTo(465, 270); 
+                ctx.lineTo(465, 165); 
+                ctx.lineTo(355, 165); 
                 ctx.closePath();
                 ctx.fill();
             }
 
-            ctx.restore();
-
-            // Continuously loop animation parameters
+            // Move the offset forward for the next frame
             lineOffset = (lineOffset + animationSpeed) % pSize;
 
             requestAnimationFrame(draw);
         }
 
-        // Kickoff
         draw();
     </script>
 </body>
