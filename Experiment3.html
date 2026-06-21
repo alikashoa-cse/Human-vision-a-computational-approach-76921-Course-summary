@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weiss & Adelson: Oscillating Rhombus</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #111;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        .experiment-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            background: #222;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 10px 50px rgba(0,0,0,0.9);
+            max-width: 95vw;
+            align-items: center;
+        }
+
+        canvas {
+            background-color: #808080; 
+            border-radius: 8px;
+            display: block;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.2);
+        }
+
+        .controls-row {
+            display: flex;
+            gap: 40px;
+            width: 100%;
+            justify-content: center;
+            align-items: flex-end;
+            padding-top: 10px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            width: 250px;
+        }
+
+        .control-group label {
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #aaa;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+            accent-color: #007aff;
+        }
+
+        .toggle-btn {
+            background-color: #444;
+            color: #fff;
+            border: none;
+            padding: 14px 24px;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: 0.2s;
+            height: 45px;
+        }
+
+        .toggle-btn.active-red { background-color: #ff3b30; }
+        .toggle-btn:hover { filter: brightness(1.2); }
+
+        .legend {
+            font-size: 13px;
+            line-height: 1.6;
+            color: #ccc;
+            background: #1a1a1a;
+            padding: 15px 25px;
+            border-radius: 6px;
+            display: flex;
+            gap: 30px;
+        }
+        
+        .legend span.red { color: #ff3b30; font-weight: bold; }
+        .legend span.blue { color: #007aff; font-weight: bold; }
+
+    </style>
+</head>
+<body>
+
+    <div class="experiment-container">
+        
+        <div class="canvas-wrapper">
+            <canvas id="simCanvas" width="900" height="550"></canvas>
+        </div>
+
+        <div class="controls-row">
+            
+            <div class="control-group">
+                <label>Shape (Thin to Fat) <span id="valShape">0.2</span></label>
+                <input type="range" id="sliderShape" min="0.05" max="1.0" step="0.05" value="0.2">
+            </div>
+
+            <div class="control-group">
+                <label>Contrast (Low to High) <span id="valContrast">10%</span></label>
+                <input type="range" id="sliderContrast" min="0" max="1" step="0.05" value="0.1">
+            </div>
+
+            <div class="control-group">
+                <label>Jiggle Speed (Freq)</label>
+                <input type="range" id="sliderSpeed" min="1" max="10" step="0.5" value="4">
+            </div>
+
+            <button id="btnVectors" class="toggle-btn">Show Motion Vectors</button>
+        </div>
+
+        <div class="legend">
+            <div><span class="red">■ IOC (True Motion):</span> Actual horizontal path (driven by corners).</div>
+            <div><span class="blue">■ VA (Vector Average):</span> Geometric normal velocity (driven by edges).</div>
+        </div>
+
+    </div>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // UI Elements
+        const sliderShape = document.getElementById('sliderShape');
+        const sliderContrast = document.getElementById('sliderContrast');
+        const sliderSpeed = document.getElementById('sliderSpeed');
+        const btnVectors = document.getElementById('btnVectors');
+        
+        const valShape = document.getElementById('valShape');
+        const valContrast = document.getElementById('valContrast');
+
+        // State variables for oscillation
+        let time = 0;
+        let showVectors = false;
+        
+        const L = 160; // Rhombus size
+        const amplitude = 180; // How far it travels left and right from the center
+
+        // Event Listeners
+        sliderShape.addEventListener('input', (e) => valShape.innerText = e.target.value);
+        sliderContrast.addEventListener('input', (e) => valContrast.innerText = Math.round(e.target.value * 100) + '%');
+        
+        btnVectors.addEventListener('click', () => {
+            showVectors = !showVectors;
+            btnVectors.classList.toggle('active-red', showVectors);
+        });
+
+        // Helper to draw clean math vectors
+        function drawVector(x, y, dx, dy, color, label) {
+            // Don't draw the vector if velocity is effectively zero
+            if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+
+            const headlen = 12;
+            const angle = Math.atan2(dy, dx);
+            const endX = x + dx;
+            const endY = y + dy;
+            
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = 4;
+            
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(endX, endY);
+            ctx.lineTo(endX - headlen * Math.cos(angle - Math.PI / 6), endY - headlen * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(endX - headlen * Math.cos(angle + Math.PI / 6), endY - headlen * Math.sin(angle + Math.PI / 6));
+            ctx.closePath();
+            ctx.fill();
+
+            // Dynamic label positioning based on vector direction
+            ctx.font = "bold 16px sans-serif";
+            const labelOffsetX = dx > 0 ? 15 : -40;
+            const labelOffsetY = dy > 0 ? 20 : -10;
+            ctx.fillText(label, endX + labelOffsetX, endY + labelOffsetY);
+        }
+
+        function draw() {
+            const f = parseFloat(sliderShape.value);
+            const contrast = parseFloat(sliderContrast.value);
+            const speedFreq = parseFloat(sliderSpeed.value);
+
+            // 1. Advance time based on the frequency slider
+            time += speedFreq * 0.015;
+            
+            // 2. Calculate Oscillation (Sine wave motion)
+            const cx = (canvas.width / 2) + Math.sin(time) * amplitude;
+            const cy = canvas.height / 2;
+            
+            // The true instantaneous velocity is the derivative (cosine) of the position
+            const vx = Math.cos(time) * amplitude * (speedFreq * 0.015); 
+
+            // 3. Clear background (Solid Middle Gray)
+            ctx.fillStyle = '#808080';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 4. Draw Rhombus
+            const rgb = Math.floor(128 + (127 * contrast)); 
+            ctx.fillStyle = `rgb(${rgb}, ${rgb}, ${rgb})`;
+            
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(Math.PI / 4); // Rotate 45 degrees
+
+            ctx.beginPath();
+            ctx.moveTo(L, 0);          
+            ctx.lineTo(0, L * f);      
+            ctx.lineTo(-L, 0);         
+            ctx.lineTo(0, -L * f);     
+            ctx.closePath();
+            ctx.fill();
+            
+            // 5. Draw Dynamic Mathematical Vectors
+            if (showVectors) {
+                // We map the velocity (vx) to pixels so the arrows shrink and grow
+                // to reflect the acceleration/deceleration of the "jiggle"
+                const vecScale = 25; 
+                
+                // IOC: True horizontal motion
+                const ioc_x = vx * vecScale;
+                const ioc_y = 0; 
+                
+                // VA: Geometric Vector Average
+                const va_x = vx * vecScale;
+                const va_y = (vx * vecScale) * ((f * f - 1) / (f * f + 1));
+
+                // Draw vectors starting from the center of the rhombus
+                drawVector(0, 0, ioc_x, ioc_y, '#ff3b30', 'IOC');
+                drawVector(0, 0, va_x, va_y, '#007aff', 'VA');
+            }
+
+            ctx.restore();
+
+            requestAnimationFrame(draw);
+        }
+
+        // Start
+        draw();
+    </script>
+</body>
+</html>
