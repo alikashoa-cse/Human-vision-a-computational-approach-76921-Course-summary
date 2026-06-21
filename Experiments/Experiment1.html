@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Moving Lines - Fixed Engine</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        
+        .canvas-container {
+            border: 4px solid #111;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            background-color: #000;
+            padding: 20px;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        .controls {
+            margin-top: 25px;
+        }
+
+        button {
+            background-color: #ffffff;
+            color: #000000;
+            border: none;
+            padding: 12px 24px;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        button:hover {
+            background-color: #ccc;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="canvas-container">
+        <canvas id="experimentCanvas"></canvas>
+    </div>
+
+    <div class="controls">
+        <button id="toggleBtn">Show Full Grid</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('experimentCanvas');
+        const ctx = canvas.getContext('2d');
+        const toggleBtn = document.getElementById('toggleBtn');
+
+        const WIDTH = 800;
+        const HEIGHT = 400;
+        canvas.width = WIDTH;
+        canvas.height = HEIGHT;
+
+        let lineOffset = 0;
+        const animationSpeed = 1.0; // The horizontal movement speed
+        let showFullGrid = false;
+
+        // 1. Create the Correct Angle (Bottom-Left to Top-Right)
+        const pCanvas = document.createElement('canvas');
+        const pCtx = pCanvas.getContext('2d');
+        const pSize = 30; // Distance between stripes
+        
+        pCanvas.width = pSize;
+        pCanvas.height = pSize;
+        
+        // Ensure equal thickness between the white lines and black gaps
+        pCtx.lineWidth = 11; 
+        pCtx.strokeStyle = '#ffffff';
+
+        /* Draw seamless mathematical diagonals (y = -x + c).
+          Drawing lines extending past the bounds guarantees a seamless loop.
+        */
+        pCtx.beginPath();
+        // Line 1
+        pCtx.moveTo(-30, 30); 
+        pCtx.lineTo(30, -30);
+        // Line 2 (Core diagonal)
+        pCtx.moveTo(-30, 60); 
+        pCtx.lineTo(60, -30);
+        // Line 3
+        pCtx.moveTo(0, 60); 
+        pCtx.lineTo(60, 0);
+        pCtx.stroke();
+
+        const stripePattern = ctx.createPattern(pCanvas, 'repeat');
+
+        // Toggle behavior
+        toggleBtn.addEventListener('click', () => {
+            showFullGrid = !showFullGrid;
+            toggleBtn.textContent = showFullGrid ? "Show Original Shapes" : "Show Full Grid";
+        });
+
+        // 2. Main Render Loop
+        function draw() {
+            // Clear background
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+            // ANIMATION MAGIC: Shift the pattern's matrix purely horizontally. 
+            // Pushing a '/' line to the right makes it visibly flow.
+            const matrix = new DOMMatrix().translate(lineOffset, 0);
+            stripePattern.setTransform(matrix);
+            
+            ctx.fillStyle = stripePattern;
+
+            if (showFullGrid) {
+                // Draw over the entire screen to prove the grid moves smoothly
+                ctx.fillRect(0, 0, WIDTH, HEIGHT);
+            } else {
+                // The shapes now use pure, static, locked-in coordinates
+                
+                // Shape 1: Vertical rectangle
+                ctx.beginPath();
+                ctx.rect(60, 110, 50, 210);
+                ctx.fill();
+
+                // Shape 2: Circle
+                ctx.beginPath();
+                ctx.arc(250, 140, 50, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Shape 3: Horizontal rectangle
+                ctx.beginPath();
+                ctx.rect(155, 235, 215, 45);
+                ctx.fill();
+
+                // Shape 4: The 'Z' block
+                ctx.beginPath();
+                ctx.moveTo(355, 120); 
+                ctx.lineTo(515, 120); 
+                ctx.lineTo(515, 225); 
+                ctx.lineTo(645, 225); 
+                ctx.lineTo(645, 270); 
+                ctx.lineTo(465, 270); 
+                ctx.lineTo(465, 165); 
+                ctx.lineTo(355, 165); 
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            // Move the offset forward for the next frame
+            lineOffset = (lineOffset + animationSpeed) % pSize;
+
+            requestAnimationFrame(draw);
+        }
+
+        draw();
+    </script>
+</body>
+</html>
