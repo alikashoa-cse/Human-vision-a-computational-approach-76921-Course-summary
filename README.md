@@ -151,7 +151,7 @@ Let’s connect this back to the core questions we established for Marr's first 
 
 Building on the ambiguity of infinite lines, Wallach designed a second set of experiments to observe what happens when lines move through confined windows, or apertures.
 
-> 💡 **Interactive Check:** To get a clear visual handle on this experiment, take a quick look at the interactive [Barber Pole Simulation](https://alikashoa-cse.github.io/Human-vision-a-computational-approach-76921-Course-summary/).
+> 💡 **Interactive Check:** To get a clear visual handle on this experiment, take a quick look at the interactive [Barber Pole Simulation](https://alikashoa-cse.github.io/Human-vision-a-computational-approach-76921-Course-summary/Experiments/Experiment1.html).
 ![[Pasted image 20260620160831.png]]
 
 Formally, Wallach defined this second phenomenon as follows:
@@ -199,10 +199,6 @@ Look closely at the two lines below:
 - **The Left Line (Infinite Vertical Line):** The line is perfectly vertical, which means its **parallel direction is straight down** and its **normal direction is to the right**. Since humans are blind to parallel motion along an infinite line, the downward component of the arrow completely disappears from our perception. Therefore, we perceive the line moving **strictly to the right**.
 - **The Right Line (Vertical Line with Horizontal "I-Bar" Caps):** Here, the terminators are formed by the vertical line intersecting the horizontal caps. As the line moves down and to the right, these intersection points are physically constrained to slide along those horizontal boundaries. Because the terminators travel **horizontally to the right** along the cap edges, this dominant terminator velocity dictates our perception. Therefore, we perceive this line moving **strictly to the right** as well!
 
-Here is the polished version of your Lecture 3 notes. I have cleaned up the terminology, formatted the equations and variables using clean Markdown/LaTeX, and structured the explanations of the competing theories so they are crystal clear for studying.
-
-I have also preserved the simulation link and your image placeholders exactly as they were!
-
 ## Lecture 3: Combining Motion Signals
 
 ### The Constraint Line
@@ -218,7 +214,7 @@ Admittedly, defining this as a "constraint line" doesn't change anything about w
 
 What happens when our visual system is confronted with two overlapping, moving gratings or lines?
 
-> 💡 **Interactive Check:** To see this phenomenon in action, take a moment to watch the interactive [Intersection of Constraints Simulation](https://alikashoa-cse.github.io/Human-vision-a-computational-approach-76921-Course-summary/VA_IOC.html).
+> 💡 **Interactive Check:** To see this phenomenon in action, take a moment to watch the interactive [Intersection of Constraints Simulation](https://alikashoa-cse.github.io/Human-vision-a-computational-approach-76921-Course-summary/Experiments/Experiment2.html).
 
 As Wallach observed, when two different sets of lines move over one another, the human visual system doesn't see two separate movements. Instead, the two sets of lines appear to lock together and **move coherently** as a single unified object (at least under certain conditions).
 
@@ -274,7 +270,7 @@ By solving this system using standard linear algebra, we pinpoint the single coo
 
 ---
 
-Here is the polished version of your notes. I have cleaned up the technical phrasing, formatted the formulas into clear, standalone LaTeX blocks, and fixed a few minor typos (like "lucas granade" and "lucas kasde"). I also found a great foundational paper to link to for the real-world extension, and provided an accurate breakdown for your quiz at the end!
+
 
 ## Motion Perception in Computer Vision
 
@@ -368,7 +364,7 @@ At the _Algorithmic Level_, various techniques can be deployed to minimize this 
 
  **Answer: FALSE** : The basic Lucas-Kanade algorithm relies on a first-order Taylor series approximation, meaning it only computes the exact solution if the physical velocity displacement $v$ is extremely small (infinitesimal). If the movement between the two frames is large, the linear approximation breaks down, and the basic algorithm will fail to find the true IOC velocity without the aid of multi-scale image pyramids.
 
-Here is the polished version of your Lecture 4 notes. I have cleaned up the typos, formalized the Bayesian equation and terminology (Likelihood, Prior, Posterior), and completed the sentence you left open to perfectly explain the philosophical and mathematical shift that Bayes' rule introduces.
+
 
 ## Lecture 4: Bayesian Decision Theory
 
@@ -451,8 +447,6 @@ Let’s look at how this formula behaves when we push the reliability of our the
 
 Ultimately, Bayesian inference provides a mathematically rigorous way to extract a stable, accurate perception of reality even when we are forced to navigate the world using deeply noisy instruments.
 
-Here is the polished, highly intuitive version of your notes for Lecture 4's application to motion. I have integrated the mathematics cleanly and completed the derivation path to show exactly how adding a prior for slow motion transforms the standard Lucas-Kanade equation into a beautiful explanation for why thin rhombuses trick our eyes.
-
 ### Connecting Bayesian Decision Theory to Motion Perception
 
 Now that we have a solid grasp of the Bayesian framework, let's see how it elegantly resolves a classic conflict in human motion perception.
@@ -470,7 +464,7 @@ In a scenario like the one above, where the two theories predict completely diff
 
 To see how the brain breaks this tie, consider the classic moving rhombus experiment:
 
-> 🔬 **Interactive Check:** Open the [Moving Rhombus Simulation](https://alikashoa-cse.github.io/Human-vision-a-computational-approach-76921-Course-summary/Experiment3.html). For the best effect, zoom in closely on your screen so that the outer edges of the window disappear, leaving only the moving rhombus itself visible.
+> 🔬 **Interactive Check:** Open the [Moving Rhombus Simulation](https://alikashoa-cse.github.io/Human-vision-a-computational-approach-76921-Course-summary/Experiments/Experiment3.html). For the best effect, zoom in closely on your screen so that the outer edges of the window disappear, leaving only the moving rhombus itself visible.
 
 If your visual system behaves like most people's, you will witness a fascinating shift in perception:
 
@@ -601,7 +595,7 @@ Even though the two inner squares have the exact same physical pixel intensity (
 - The gray square on the **dark background** looks significantly lighter.
 - The gray square on the **light background** looks significantly darker.
 
-> 🔬 **Interactive Check:** If your brain is trying to tell you this is a trick, go prove it to yourself using the [Simultaneous Contrast Simulation](https://alikashoa-cse.github.io/Human-vision-a-computational-approach-76921-Course-summary/Experiment4.html).
+> 🔬 **Interactive Check:** If your brain is trying to tell you this is a trick, go prove it to yourself using the [Simultaneous Contrast Simulation](https://alikashoa-cse.github.io/Human-vision-a-computational-approach-76921-Course-summary/Experiments/Experiment4.html).
 
 This phenomenon is formally known as the **Simultaneous Contrast Effect**. It tells us something fundamental about computational vision: **Human brightness perception is not pixel-perfect.** Your brain doesn't act like a light meter measuring absolute luminance; instead, it computes brightness _relatively_, evaluating an object based on its surrounding context.
 
