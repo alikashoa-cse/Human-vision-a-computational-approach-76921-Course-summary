@@ -714,5 +714,464 @@ By solving this internal equation, your brain successfully estimates that Square
     - When the sun is directly overhead, the incoming light rays are parallel to the surface normal of a flat piece of paper. The angle $\theta$ between the light source and the normal is $0^\circ$, and since $\cos(0^\circ) = 1$, the reflected light intensity is maximized ($I = \rho L$).
     - For the paper tilted at $45^\circ$, the angle becomes $\theta = 45^\circ$. Since $\cos(45^\circ) \approx 0.707$, the tilted paper physically receives and reflects roughly 30% less light than the flat paper.
 
-## Lecture 6 retinex
+## Lecture 6: The Retinex Algorithm & Intrinsic Images
 
+### Intrinsic Images
+
+To make the ill-posed problem of brightness perception mathematically trackable, we can group our physical terms into a slightly simplified framework called **Intrinsic Images**. Instead of dealing with three separate terms ($I = \rho L \cos\theta$), we consolidate scene geometry ($\cos\theta$) and light source strength ($L$) into a single spatial illumination field, $L(x,y)$.
+
+This allows us to break down the image hitting our eyes, $I(x,y)$, into the product of just two core components:
+
+$$I(x,y) = R(x,y) \cdot L(x,y)$$
+
+Where:
+
+- **$R(x,y)$ — The Reflectance Image:** The intrinsic material properties of the surfaces (playing the exact same role as Albedo).
+- **$L(x,y)$ — The Illumination Image:** The amount of light hitting those surfaces, which captures shadows, highlights, and shading gradients.
+ ![[Pasted image 20260621162601.png]]
+
+By reducing the equation to two components, our life gets significantly easier: if we can accurately approximate just _one_ of these layers, we automatically get the other layer for free via simple division. However, without adding extra ecological constraints, it is still mathematically impossible to solve.
+
+To bridge this gap, Edwin Land's **Retinex Algorithm** introduces two fundamental assumptions about how edges behave in the real world:
+
+1. Every spatial gradient (change in pixel intensity) in an image is strictly caused by _either_ a change in illumination or a change in material reflectance.
+2. **Sharp, abrupt jumps in intensity** are assumed to be caused by changes in **reflectance** (material boundaries). **Smooth, gradual changes in intensity** are assumed to be caused by variations in **illumination** (shadows or curved lighting).
+
+#### Why Do These Assumptions Make Sense?
+
+In the natural world, physical objects tend to be made of uniform materials with consistent pigments. When you transition from one object to another (e.g., from a green shirt to a leather jacket), the material properties change instantaneously at the border, creating a sharp, high-frequency jump in intensity.
+
+On the flip side, light sources are usually distant or diffuse. As light spreads across a surface or a shadow softens along its edges, the change in ambient illumination happens gradually over space, creating smooth, low-frequency gradients.
+
+While these assumptions can be violated in edge-case scenarios (like a crisp, hard-edged shadow from a laser pointer), they hold true in enough real-world scenes to make Retinex an incredibly powerful and helpful algorithm.
+
+### The Simplified 1D Retinex Algorithm
+
+To execute this separation cleanly, Retinex shifts the multiplicative relationship into an additive one by operating in log-space. Let $i = \log(I)$, $l = \log(L)$, and $r = \log(R)$:
+
+$$i(x,y) = l(x,y) + r(x,y)$$
+
+Next, we take the spatial gradient of our log-image, $\nabla i$:
+
+$$\nabla i = \nabla l + \nabla r$$
+
+We then pass the gradient magnitudes through a thresholding filter $T$:
+
+- **If $|\nabla i| < T$:** The change is small and smooth. We attribute it entirely to illumination:$$\nabla l = \nabla i \quad \text{and} \quad \nabla r = 0$$
+- **If $|\nabla i| \ge T$:** The change is a sharp jump. We attribute it entirely to reflectance:$$\nabla r = \nabla i \quad \text{and} \quad \nabla l = 0$$
+Finally, we integrate the isolated gradient fields ($\nabla r$ and $\nabla l$) to reconstruct the log-maps $r$ and $l$, and then exponentiate them ($R = e^r, L = e^l$) to recover our final intrinsic images. Note that the threshold $T$ is a highly influential hyperparameter that dictates how aggressively edges are classified.
+
+### Expanding to 2D: The Laplacian Integration
+
+In a simple 1D image (a single row of pixels), integrating a gradient is straightforward. However, when we move to 2D image grids, a filtered gradient field ($\nabla r$) is almost never a conservative vector field, meaning standard line integration will fail and depend on the path you take.
+
+To resolve this, we take the derivative of our gradient fields by applying the **Laplacian operator** ($\Delta$ or $\nabla^2$), which calculates the sum of second-order partial derivatives:
+
+$$\Delta i = \frac{\partial^2 i}{\partial x^2} + \frac{\partial^2 i}{\partial y^2}$$
+
+By applying the Laplacian to our thresholded reflectance gradients, we set up a classic **Poisson Equation**:
+
+$$\Delta r = \text{div}(\nabla r_{\text{thresholded}})$$
+
+To reconstruct the final 2D reflectance image, computers solve this partial differential equation using numerical methods (such as the Discrete Fourier Transform or iterative relaxation techniques like the Gauss-Seidel method). This ensures a smooth, mathematically consistent global surface reconstruction across the entire 2D image grid.
+
+### Does Human Vision Use Retinex?
+
+To determine if human vision utilizes a Retinex-like strategy at Marr's _Computational Level_, we have to verify whether our brains rely on the same fundamental assumption—specifically, that slow, gradual gradients represent illumination changes, not material changes.
+
+Fascinating evidence from art history suggests we do. Masters of the High Renaissance, including Leonardo da Vinci, discovered that to paint a convincing shadow, they could not simply draw a sharp black line. They formalized that a real shadow consists of two regions:
+
+1. **The Umbra:** The central, deeply dark core where the light source is completely blocked.
+2. **The Penumbra:** The fuzzy, outer fuzzy fringe where the light source is only partially obscured, creating a smooth blur gradient from light to dark.![[Pasted image 20260621165209.png]]
+ _Historical sketch by Leonardo da Vinci demonstrating the geometry of light casting an umbra and a penumbra._
+
+If you paint a shadow _without_ a penumbra, the human brain gets confused and often interprets the sharp transition as a dark paint mark on the object (a change in reflectance) rather than a shadow (a change in illumination). The fact that our brains rely so heavily on the smooth gradient of a penumbra to recognize a shadow confirms that human vision uses the exact same computational assumptions as Retinex!
+
+## Summary
+
+- **The Retinex core assumption:** Sharp changes in image intensity are caused by material reflectance, while smooth gradients are caused by illumination.
+- **Input/Output behavior:** The algorithm takes a single raw image as input ($I$) and produces two processed intrinsic images as output ($R$ and $L$).
+- **The Penumbra Connection:** The absolute requirement of a penumbra for humans to perceive realistic shadows strongly suggests that our visual system employs these identical edge-classification strategies.
+
+## Quiz
+### Question 1: The Truck Shadow
+![[Pasted image 20260621170121.png]]
+**Question:** (T/F) The point marked "A" (Image 1) is in the penumbra.
+
+##### Answer: FALSE
+
+- **Explanation:** While the shadow cast onto the road definitely features a blurry penumbra along its outer perimeter, the arrow for "A" points directly into the deep, pitch-black central core of the shadow under the truck. Because this core region is completely shielded from the sun, it is the **umbra**.
+
+### Question 2: Cindy Crawford's Cheek Contour
+
+**Question:** (T/F) The gradient at the location marked "A" (Image 2) would be labeled as a reflectance change by the Retinex algorithm.
+
+#### Answer: FALSE
+
+- **Explanation:** Point "A" points to the smooth, gradual shading gradient along the curve of the cheekbone. Because the cheek curves smoothly away from the light source, it creates a very low-frequency change in pixel intensity. Since the gradient magnitude is small ($|\nabla i| < T$), the Retinex algorithm will classify it as an **illumination/shading change**, not a change in material reflectance
+
+## Lecture 7: White Balance & Color Constancy
+
+### The White Balance Problem
+
+In the last lecture, we learned how the Retinex algorithm translates an image $I(x,y)$ into its intrinsic reflectance $R(x,y)$ and illumination $L(x,y)$. However, because the final step of Retinex requires taking an integration over gradient fields, **the resulting estimates are only true up to a scaling constant.** This ambiguity sets the stage for our next major computational hurdle: the **White Balance Problem**.
+
+To understand this problem with a concrete numerical example, imagine a simple image $I$ consisting of just four pixels:
+
+$$I = (100, 125, 125, 150)$$
+
+Because of the scaling ambiguity, this single physical image can be decomposed and interpreted by a computer in multiple ways depending on what we assume the maximum ambient light level is:
+
+- **Interpretation A (Assuming $L = 255$):**$$I = 255 \times \left(\frac{100}{255}, \frac{125}{255}, \frac{125}{255}, \frac{150}{255}\right)$$
+- **Interpretation B (Assuming $L = 150$):**$$I = 150 \times \left(\frac{100}{150}, \frac{125}{150}, \frac{125}{150}, \frac{150}{150}\right)$$
+
+Look at what happens to the middle pixels ($125$) under these different interpretations. In Interpretation A, $\frac{125}{255} \approx 0.49$, meaning the brain perceives those pixels as a neutral **gray**. In Interpretation B, $\frac{125}{150} \approx 0.83$, meaning the exact same pixels are perceived as a bright **white**.
+
+Mathematically, our goal is to find an algorithm that takes a raw image $I(x,y)$ and correctly extracts the true material reflectance $\rho(x,y)$ and the global illumination constant $L$. For an image with $N$ pixels, we have $N$ inputs, but we are trying to solve for $N + 1$ unknowns ($N$ reflectance values plus $1$ global illumination value). Because this is mathematically underdetermined, any algorithm we propose will be an **approximation heuristic**, not a definitive truth.
+
+### Heuristic 1: The Gray World Algorithm
+
+The **Gray World Algorithm** operates on a core statistical assumption about the world: if you average all the colors and material reflectances in a typical natural scene, they will average out to a neutral, middle gray ($\rho_{\text{avg}} = 0.5$).
+
+Using this assumption, we can state that the average pixel intensity of our image must equal half of the total illumination:
+
+$$\frac{1}{N} \sum_{x,y} I(x,y) = 0.5 \cdot L$$
+
+From here, we can easily isolate and solve for the unknown illumination constant $L$:
+
+$$L = \frac{2}{N} \sum_{x,y} I(x,y)$$
+
+Once we have approximated $L$, recovering the true material reflectance for every individual pixel is simple:
+
+$$\rho(x,y) = \frac{I(x,y)}{L}$$
+
+### Heuristic 2: The Brightest = White Algorithm
+
+Alternatively, we can use a completely different heuristic: the **Brightest = White Algorithm**. This strategy assumes that the highest intensity pixel in any given image represents a perfectly reflective, pure white surface ($\rho_{\text{max}} = 1.0$).
+
+Using this rule, the maximum intensity pixel directly reveals our illumination boundary:
+
+$$\max_{x,y} I(x,y) = 1.0 \cdot L$$
+
+Therefore, the global illumination is simply $L = \max_{x,y} I(x,y)$, and the reflectance image is calculated by dividing everything by that peak value:
+
+$$\rho(x,y) = \frac{I(x,y)}{\max_{x,y} I(x,y)}$$
+
+> 🧠 **Why "Darkest = Black" Fails:** You might wonder why we don't build an inverse algorithm assuming the darkest pixel is pure black ($\rho = 0$). Mathematically, this fails completely because it would mean setting $0 \cdot L = \min(I)$. Multiplying $L$ by zero completely destroys our ability to isolate the illumination constant. This makes perfect ecological sense: a true black surface absorbs all incoming light, meaning it reflects absolutely no color data back to your eye regardless of how bright the ambient light source is.
+
+### What Algorithm Do Humans Actually Use?
+
+To figure out which strategy our biological vision aligns with, we can look at a case where the two algorithms fundamentally disagree. Consider a completely uniform, flat image where every single pixel has the exact same intensity value of 100:
+
+$$I = (100, 100, 100, 100)$$
+
+- **The Gray World Algorithm** looks at this, computes the average as 100, and concludes that the scene is a **middle gray** ($\rho = 0.5$) under an illumination of $L = 200$.
+- **The Brightest = White Algorithm** looks at this, finds the maximum value is 100, and concludes that the scene is a highly reflective **pure white** surface ($\rho = 1.0$) under an illumination of $L = 100$.
+
+When human subjects are placed in a completely uniform testing environment with no external context, **they overwhelmingly perceive the surface as white.** Psychophysical experiments like this confirm that the human visual system relies on a strategy much closer to the **Brightest = White** algorithm to lock in its color constancy and white balance.
+
+
+### The Simplified RGB Color Model
+
+Up until this point, we have restricted our discussion strictly to grayscale intensities. Now, it's time to add color to our universe.
+
+To keep the math and concepts manageable, we are going to start with a simplified model: the **RGB Color Space**. While this three-channel approach mimics how digital cameras and computers process color rather than reflecting full, continuous physical light spectra, it serves as an excellent foundational approximation.
+
+In this simplified color world, the physical rules of Lambert's Law remain exactly the same, but instead of our eyes capturing a single broad intensity value, we capture three distinct, parallel projections of light at every pixel location:
+
+$$\begin{aligned} I_r(x,y) &= \rho_r L_r \cos\theta \\ I_g(x,y) &= \rho_g L_g \cos\theta \\ I_b(x,y) &= \rho_b L_b \cos\theta \end{aligned}$$
+
+Where:
+
+- $I_r, I_g, I_b$ represent the intensity values captured in the Red, Green, and Blue channels.
+- $\rho_r, \rho_g, \rho_b$ are the material's intrinsic reflectance properties (albedos) for each respective color.
+- $L_r, L_g, L_b$ represent the color components of the ambient illumination source.
+
+By mixing these three channels, we construct our color perceptions. For example:
+
+- $(0.8, 0.8, 0.8)$ results in a neutral, bright **white/gray**.
+- $(0.8, 0.2, 0.2)$ results in a dominant **red**.
+- $(0.8, 0.8, 0.2)$ combines red and green light to create **yellow**.
+
+### The Color Constancy Problem
+
+With three channels, our computational problem becomes significantly more complex. We are no longer trying to solve for a single global illumination constant; we now have to figure out the color of the ambient light source itself (e.g., is the scene lit by blue skylight, yellow candlelight, or white fluorescent bulbs?).
+
+For an image containing $N$ pixels, we receive $3N$ inputs (an R, G, and B value for every pixel). However, we are forced to solve for $3N + 3$ unknowns ($3N$ separate material reflectances plus $3$ independent channel illumination constants).
+
+This underdetermined mathematical puzzle is called the **Color Constancy Problem**.
+
+To solve this in computer vision, a simple baseline approach is to treat each color channel as its own independent grayscale image, executing our previous **Gray-World** or **Brightest=White** algorithms separately across the R, G, and B planes.
+
+While these independent channel approximations frequently break down in complex environments, human vision is prone to the exact same computational failures.
+
+![[Pasted image 20260621195736.png]]
+_An image demonstrating how a strong colored ambient light source can completely distort our ability to perceive the true underlying material colors._
+
+If you wash a scene in a strong, monochromatic yellow light, your brain struggle to subtract the illumination accurately, distorting your perception of the true underlying material pigments.
+
+> 🔬 **Interactive Check:** To test the limits of your own biological color constancy under varying illumination wavelengths, try out the [Color Constancy Interactive Experiment](https://alikashoa-cse.github.io/Human-vision-a-computational-approach-76921-Course-summary/Experiments/Experiment5.html).
+
+## Summary
+
+- **White Balance:** Given the scalar equation $I(x,y) = \rho(x,y)L$, the goal is to isolate and estimate the material reflectance $\rho(x,y)$ and the illumination constant $L$.
+- **Color Constancy:** This represents the exact same computational challenge, expanded across three independent color channels (Red, Green, and Blue).
+- **Algorithmic Approximations:** Both the Gray-World and "Brightest=White" heuristics can be generalized and applied channel-by-channel to address both white balance and color constancy problems.
+- **Human Performance:** While human visual processing is vastly more sophisticated than these simple computer vision shortcuts, our biological systems rely on variants of the "Brightest=White" constraint to anchor our perceptions.
+
+## Quiz
+
+
+### Question 1: Mathematical "Brightest=White" Application
+
+**Question:** (T/F) Assume an image vector $I = (200, 300, 300, 300, 400)$. Under the "Brightest=White" algorithm, the reflectance of the first pixel is $0.5$ and it would be perceived as "gray".
+
+#### Answer: TRUE
+
+- **Step-by-Step Calculation:**
+    1. The "Brightest=White" algorithm defines the global illumination constant $L$ as the maximum pixel intensity in the array:$$L = \max(I) = 400$$
+    2. To compute the reflectance ($\rho$) of the first pixel, we divide its raw intensity value by our newly calculated $L$:$$\rho_1 = \frac{I_1}{L} = \frac{200}{400} = 0.5$$
+    3. Because an intrinsic reflectance of $0.5$ lands perfectly halfway between black ($0.0$) and white ($1.0$), the brain interprets this material surface as a neutral **gray**.
+
+### Question 2: RGB Color Mixing Theory
+
+**Question:** (T/F) A shirt whose albedo is $\rho_R = 0.2, \rho_g = 0.8, \rho_b = 0.8$ would be called "yellow".
+
+#### Answer: FALSE
+
+- **Explanation:** In the RGB additive color mixing model:
+    
+    - **Yellow** is created by mixing high amounts of Red and Green light while suppressing Blue ($\rho_R = \text{high}, \rho_g = \text{high}, \rho_b = \text{low}$).
+    - In this specific question, the shirt absorbs red light ($\rho_R = 0.2$) and reflects high amounts of Green and Blue light ($\rho_g = 0.8, \rho_b = 0.8$). Combining green and blue light produces the color **Cyan** (or a bright teal/aqua), not yellow!
+
+## Lecture 8: Color Physics & Human Color Perception
+
+### The Infinite-Dimensional Reality of Light
+
+In our simplified RGB world, we treated color as a neat combination of three discrete channels. However, real physics does not abide by this simplicity. As Sir Isaac Newton famously demonstrated by splitting white light with a prism, sunlight contains a continuous, infinite spectrum of wavelengths.
+
+![[Pasted image 20260621203333.png]]
+
+In the real world, a light source cannot be captured by just three numbers. Instead, it is described by a continuous function, $I(\lambda)$, which represents the relative physical energy emitted at each individual wavelength ($\lambda$). While the electromagnetic spectrum is vast, the human visual system is biologically limited to a narrow window of **visible light** spanning from roughly **400 to 700 nanometers**.
+
+Because of this, the physical law we used earlier (Lambert's Law) must be applied to every single wavelength independently:
+
+![[Pasted image 20260621203808.png]]
+
+$$I(\lambda) = \rho(\lambda) L(\lambda) \cos\theta$$
+
+This physical reality means that color, at its input level, is **infinite-dimensional**.
+
+### The Mystery of Metamers
+
+If physical light is infinite-dimensional, how does the human brain compress this infinite stream of data into a manageable perception? To understand this abstraction, we look at a core phenomenon called **metamerism**.
+
+> 💡 **Definition:** Two light sources with completely different physical energy spectra, $I_1(\lambda)$ and $I_2(\lambda)$, are called **metamers** (denoted $I_1 \equiv I_2$) if they are perceived as completely identical by a human observer.
+
+To map out this phenomenon, scientists design **color-matching experiments**. An observer looks at a split screen: one side displays a target test light, and the other side contains a mixture of primary lights. The observer adjusts the knobs of the primary lights until the two sides match perfectly.
+
+> 🔬 **Interactive Check:** To experience color-matching yourself and see how primary channels blend to mimic monochromatic lights, try the [Color Matching Interactive Experiment](https://alikashoa-cse.github.io/Human-vision-a-computational-approach-76921-Course-summary/Experiments/Experiment6.html).
+
+### Grassmann’s Laws of Linear Color Space
+
+Through extensive color-matching trials, Hermann Grassmann formalized the empirical rules governing how humans match colors. For any light spectra, the following algebraic properties consistently hold true:
+
+- **Symmetry:** $V \equiv U \iff U \equiv V$
+- **Transitivity:** $U \equiv V \quad \text{and} \quad V \equiv W \implies U \equiv W$
+- **Proportionality (Scaling):** $U \equiv V \iff tU \equiv tV$
+- **Additivity:** $U \equiv V \quad \text{and} \quad X \equiv Y \implies U + X \equiv V + Y$
+
+Because these biological observations perfectly mirror the axioms of linear vector spaces, they provide explicit permission to model human color perception using **linear algebra**.
+
+### Color Perception as a Vector-Matrix Product
+
+We can mathematically formalize the compression of color in our brain as a linear dimensionality reduction from an infinite-dimensional space (approximated computationally as a highly sampled vector, e.g., $\mathbb{R}^{400}$) down to a low-dimensional internal vector space $\mathbb{R}^K$:
+
+$$y = S I$$
+
+Where:
+
+- $I \in \mathbb{R}^{400}$ is the physical energy vector of the light spectrum sampled across wavelengths.
+- $y \in \mathbb{R}^K$ is the compressed, low-dimensional color vector represented in our brain.
+- $S \in \mathbb{R}^{K \times 400}$ is the linear sensor mapping matrix of our visual system.
+
+Because the number of internal tracking dimensions is far smaller than the physical inputs ($K \ll 400$), the matrix $S$ possesses a massive null space. This mathematical reality guarantees that infinitely many different light vectors $I$ will map to the exact same internal coordinate $y$—proving why metamers exist.
+
+### Deriving the Biological Parameters ($K$ and $S$)
+
+Can we discover the exact value of $K$ (the number of dimensions) and the shape of the sensor matrix $S$ purely from behavioral color-matching experiments? **Yes, we can.**
+
+#### 1. Finding the Dimensionality ($K$)
+
+During human color-matching experiments, researchers discovered that if they provided observers with **exactly three independent primary lights**, the observers could successfully match any target light spectrum. If they were given only two, many colors were impossible to replicate. This empirical behavioral breakthrough proved that **$K = 3$** for human vision.
+
+#### 2. The Color-Matching Matrix ($C$)
+
+Let $P \in \mathbb{R}^{400 \times 3}$ be a matrix whose three columns represent the spectral footprints of our chosen primary lights. The combination weights selected by the user can be written as a vector $\alpha = (\alpha_1, \alpha_2, \alpha_3)^T$. Since the final mixture light $P\alpha$ is a metamer to the target light $I$, their internal brain representations must match:
+
+$$S(P\alpha) = SI \implies (SP)\alpha = SI$$
+
+Assuming the chosen primary lights are independent, the $3 \times 3$ matrix $(SP)$ is invertible, allowing us to isolate the knob adjustments ($\alpha$):
+
+$$\alpha = (SP)^{-1}SI$$
+
+We can encapsulate this entire empirical operation into a single, observable **Color-Matching Matrix ($C$)**:
+
+$$\alpha = CI, \quad \text{where } C = (SP)^{-1}S$$
+
+We can reconstruct $C$ column-by-column in a lab simply by testing standard monochromatic impulse lights ($e_i$).
+
+#### 3. Recovering the Brain's Sensor Matrix ($S$)
+
+Notice the elegant relationship discovered above: $C = (SP)^{-1}S$. Because $(SP)^{-1}$ is merely a square $3 \times 3$ blending matrix, this proves that **the empirical color-matching matrix $C$ is mathematically identical to the brain's internal sensor sensitivity matrix $S$, up to an arbitrary $3 \times 3$ linear transformation.**
+
+### Grounding the Math in Biological Reality
+
+When biology catches up to the computational theory, the alignment is flawless. Looking at the hardware level (the retina), humans possess two categories of photoreceptors: **rods** (highly sensitive to light levels, used for night vision) and **cones** (used for color vision).
+
+![[Pasted image 20260621211525.png]]
+
+The cones are the color-sensitive receptors. When biologists physically measured the light absorption spectra of human cones, they found exactly **three distinct types of cones**, categorized by their wavelength tuning:
+
+- **S Cones:** Tuned to short wavelengths (Blue)
+- **M Cones:** Tuned to medium wavelengths (Green)
+- **L Cones:** Tuned to long wavelengths (Red)
+
+The spectral sensitivity curves of these three physical cone types map perfectly to the linear rows of the sensor matrix $S$ we predicted using behavioral algebra! Furthermore, conditions like colorblindness occur when an individual is genetically missing one of these three cone channels, compressing their matrix mapping from $3 \times 3$ down to a rank-2 system.
+
+## Summary
+
+- **Dimensional Disconnect:** Physical color is continuous and infinite-dimensional, but the widespread existence of metamers proves our internal perceptual color space is highly compressed.
+- **Linear Systems:** Grassmann's Laws reveal that human color matching satisfies the mathematical conditions of linearity, allowing us to model vision as a matrix-vector dimensionality reduction: $y = SI$.
+- **System Recovery:** By running behavioral color-matching experiments, we can completely reconstruct the human color dimensionality ($K=3$) and isolate the sensor matrix $S$ up to an invertible $3 \times 3$ transformation matrix.
+
+## Quiz
+
+### Question 1: Metamers and Scaling
+
+**Question:** (T/F) There exist two lights $I_1, I_2$ such that $I_1$ and $I_2$ are metamers, but $2I_1$ and $2I_2$ are not metamers.
+
+#### Answer: FALSE
+
+- **Explanation:** This statement directly violates **Grassmann’s Law of Proportionality**. By definition, if two lights are perceived as identical ($I_1 \equiv I_2$), their internal brain coordinates are equal ($S I_1 = S I_2$). Due to the fundamental linearity of matrix-vector multiplication, scaling both inputs by any scalar constant $t$ yields:
+    
+    $$S(2I_1) = 2(SI_1) = 2(SI_2) = S(2I_2)$$
+    
+    Because their transformed brain coordinates remain perfectly equal, $2I_1$ and $2I_2$ are guaranteed to remain metamers.
+    
+
+### Question 2: Canine Color Dimensionality
+
+**Question:** (T/F) For dogs, it is possible to find a match to any light source using only two primary lights.
+
+#### Answer: TRUE
+
+- **Explanation:** Unlike trichromatic humans ($K=3$), dogs are biologically **dichromatic**. Their retinas contain only two distinct types of color cones (equivalent to our S and L cones). Because a dog's internal color space is reduced to $K=2$, their sensor matrix $S_{\text{dog}}$ maps to a 2D coordinate space. Therefore, a dog only requires a system of two independent primary lights ($2 \times 2$ invertible matrix) to behavioral-match any incoming spectral light configuration perfectly.
+
+
+## Lecture 9: Structure from Motion (SFM)
+
+### Transitioning to "Form" and 3D Reconstruction
+
+Congratulations on hitting the next major milestone in the course! Two out of our three core pillars—Motion and Color—are now completely behind us. We are officially entering our final module: **Shape, Stereo, and Form Processing**.
+
+The primary question we will be asking ourselves throughout this module is: _How do we recover 3D structure from flat, 2D visual data?_
+
+Formally, we want to take a set of 2D coordinates tracked on a screen:
+
+$$\begin{pmatrix} x_i \\ y_i \end{pmatrix}$$
+
+And reconstruct their true, original 3D positions in the world:
+
+$$\begin{pmatrix} X_i \\ Y_i \\ Z_i \end{pmatrix}$$
+
+Mathematically, dropping a dimension throws away critical information. Trying to map a 2D point back to a 3D coordinate opens up an infinite line of possibilities, making the inverse mapping completely ill-posed.
+
+To tackle this challenge, let's look at the forward problem first: how 3D world points project onto a 2D camera sensor. For now, we will work under the framework of an **Orthographic Projection**.
+
+![[Pasted image 20260621214713.png]]
+
+An orthographic projection simply drops the depth coordinate ($Z$) entirely:
+
+$$\text{proj}\begin{pmatrix} X \\ Y \\ Z \end{pmatrix} = \begin{pmatrix} X \\ Y \end{pmatrix}$$
+
+Using basic geometry, it is easy to see that **parallel lines remain perfectly parallel** under an orthographic projection. While real-world physics behaves like a _perspective projection_ (where objects shrink as they move further away along the $Z$-axis, as shown in the slide diagram), starting with an orthographic model simplifies the equations so we can build a working foundation.
+
+### Structure from Motion: Factoring in Time
+
+When an object moves through space over time, its coordinates are no longer static. Our input data becomes a series of tracked 2D feature coordinates across multiple video frames, $x_i(t), y_i(t)$, and our goal is to track down their changing 3D paths:
+
+$$\begin{pmatrix} x_i(t) \\ y_i(t) \end{pmatrix} \longrightarrow \begin{pmatrix} X_i(t) \\ Y_i(t) \\ Z_i(t) \end{pmatrix}$$
+
+Just like the static case, there are infinitely many 3D trajectories that could explain any given 2D video. To narrow down the possibilities to a single correct answer, we apply a massive ecological constraint: the **Rigid Body Assumption**.
+
+We assume that the moving points belong to a solid, non-deformable object. This means the 3D coordinates at any time $t$ are simply a rigid rotation of their initial coordinates at time $0$, driven by a time-varying $3 \times 3$ rotation matrix $M(t)$:
+
+$$\begin{pmatrix} X_i(t) \\ Y_i(t) \\ Z_i(t) \end{pmatrix} = M(t) \begin{pmatrix} X_i(0) \\ Y_i(0) \\ Z_i(0) \end{pmatrix}$$
+
+If we track $P$ individual feature points over $T$ distinct video frames, we have $4T + 3P$ unknown variables (accounting for the changing camera rotations over time and the static 3D coordinates of each point). However, our video gives us $2TP$ independent coordinate equations. As long as we track a large number of points over a long enough video sequence, $2TP \ge 4T + 3P$, and the system becomes completely solvable!
+
+### The Tomasi-Kanade Factorization Algorithm
+
+Carlo Tomasi and Takeo Kanade (1992) developed an elegant linear algebra algorithm to solve this problem by organizing our observations into three distinct matrices:
+
+- **$W_{2T \times P}$ (The Measurement Matrix):** This matrix holds our raw 2D data across all frames. Every column represents a tracked feature point, and every pair of rows represents a video frame. The odd rows contain the $x$-coordinates of all points in frame $t$, and the even rows contain the $y$-coordinates.
+- **$M_{2T \times 3}$ (The Motion Matrix):** This matrix holds the camera's rotational state. The odd rows contain the first row of the rotation matrix $M(t)$, and the even rows contain the second row of $M(t)$.
+- **$S_{3 \times P}$ (The Structure Matrix):** This matrix holds the permanent 3D shape of the object. Each column $i$ contains the static 3D coordinate $(X_i, Y_i, Z_i)^T$ of point $i$ at time zero.
+    
+
+By combining our rigid body and orthographic equations, the entire video sequence collapses into a simple matrix multiplication:
+
+$$W = M \cdot S$$
+
+Because the matrix $W$ is the product of a matrix with $3$ columns ($M$) and a matrix with $3$ rows ($S$), **the measurement matrix $W$ can have a rank of at most 3.** This rank constraint is highly profound—it means that no matter how many hundreds of frames or thousands of points you track, all that massive 2D data is constrained to sit inside a tight 3D subspace.
+
+#### Solving the System Using Singular Value Decomposition (SVD)
+
+To separate $W$ back out into its independent components ($M$ and $S$), we apply **Singular Value Decomposition (SVD)**. Any rectangular matrix $W$ of rank $K=3$ can be decomposed into:
+
+$$W = U \Sigma V^T$$
+
+Where $U$ is a $2T \times 3$ matrix, $\Sigma$ is a $3 \times 3$ diagonal matrix of singular values, and $V^T$ is a $3 \times P$ matrix. This gives us an immediate initial candidate for our motion and structure matrices:
+
+$$\tilde{M} = U, \quad \tilde{S} = \Sigma V^T$$
+
+However, this initial factorization is not unique. For any invertible $3 \times 3$ linear transformation matrix $A$, we can insert an identity step ($A A^{-1} = I$) into our equation:
+
+$$W = \tilde{M} \tilde{S} = \tilde{M}(A A^{-1})\tilde{S} = (\tilde{M}A)(A^{-1}\tilde{S})$$
+
+Therefore, the true physical motion matrix $M$ and the true structural shape matrix $S$ are related to our SVD candidates up to a $3 \times 3$ affine transformation:
+
+$$M = \tilde{M}A, \quad S = A^{-1}\tilde{S}$$
+
+By enforcing standard geometric properties (such as the constraint that the rows of a true rotation matrix $M$ must be unit vectors and mutually orthogonal), we can solve for the remaining coefficients in $A$. With $A$ in hand, the algorithm successfully reconstructs the full 3D shape matrix $S$ and the 3D path matrix $M$ using nothing but a flat 2D video!
+
+### Do Humans Use This Strategy?
+
+When we look at psychophysical data, evidence confirms that **the human visual system solves this problem using the exact same rigidity assumptions at Marr's Computational Level.** If you show a human a 2D animation of scattered dots moving randomly on a flat screen, their brain suddenly snaps the dots together, perceiving a clear, rigid 3D cylinder or sphere spinning in depth. Our visual system actively optimizes for a rigid 3D interpretation to make sense of 2D retinal motion.
+
+## Summary
+
+
+- **Orthographic Mapping:** Under an orthographic projection model, 3D world coordinates $(X, Y, Z)$ map directly to 2D screen coordinates $(X, Y)$ by stripping away depth.
+- **The Rank-3 Constraint:** Tracking the rotation of a rigid body over time yields a combined measurement matrix $W$ that is mathematically restricted to a maximum rank of 3 under orthography.
+- **SVD Reconstruction:** Singular Value Decomposition (SVD) serves as the primary algebraic engine to factor this measurement space, allowing us to successfully extract 3D structure and camera motion from 2D pixel tracks.
+
+## Quiz
+
+### Question 1: SVD Matrix Invariance
+
+**Question:** (T/F) Any rectangular matrix $W_{M \times N}$ can be written as: $W = U \Sigma V$ with $U_{M \times K}, \Sigma_{K \times K}, V_{K \times N}$.
+
+#### Answer: TRUE
+
+- **Explanation:** This is a fundamental theorem of linear algebra. Every real rectangular matrix $W_{M \times N}$ possesses a Singular Value Decomposition. If the matrix has a rank of $K$, it can always be factored into an orthogonal matrix $U_{M \times K}$ containing the left-singular vectors, a diagonal matrix $\Sigma_{K \times K}$ containing $K$ positive singular values, and an orthogonal matrix $V_{K \times N}$ containing the right-singular vectors.
+
+### Question 2: Orthographic Geometry of a Cube
+
+**Question:** (T/F) In an orthographic projection of a cube, all the sides are rectangles.
+
+#### Answer: FALSE
+
+- **Explanation:** Let's look at the geometry of projection lines. If a cube is perfectly aligned parallel to the camera sensor, its faces project as perfect squares/rectangles. However, if the cube rotates in 3D space relative to the viewer, its square faces tilt away from the camera plane.
+- Because orthographic projection projects points along parallel lines orthogonal to the image plane, tilting a square face causes its 2D projection to deform into a **parallelogram**, not a rectangle (the internal angles will no longer be $90^\circ$).
