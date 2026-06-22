@@ -1175,3 +1175,207 @@ When we look at psychophysical data, evidence confirms that **the human visual s
 
 - **Explanation:** Let's look at the geometry of projection lines. If a cube is perfectly aligned parallel to the camera sensor, its faces project as perfect squares/rectangles. However, if the cube rotates in 3D space relative to the viewer, its square faces tilt away from the camera plane.
 - Because orthographic projection projects points along parallel lines orthogonal to the image plane, tilting a square face causes its 2D projection to deform into a **parallelogram**, not a rectangle (the internal angles will no longer be $90^\circ$).
+
+
+## Lecture 10: Perspective Projection & Vanishing Points
+
+### Shifting to Perspective Projection
+
+Now that we understand how to handle multi-frame sequences, let's look at a completely different problem: _How do we recover 3D depth from a single, static 2D image?_
+
+To explore this, we must abandon our simple orthographic model and transition to a physically accurate model of human and camera optics: **Perspective Projection**.
+
+![[Pasted image 20260621214713.png]]
+
+Under a perspective projection model, a 3D point maps to a 2D position by dividing its coordinates by its depth coordinate ($Z$) alongside a focal length scaling factor $f$:
+
+$$\text{Proj}\begin{pmatrix} X \\ Y \\ Z \end{pmatrix} = f \begin{pmatrix} \frac{X}{Z} \\ \frac{Y}{Z} \end{pmatrix}$$
+
+Because the depth coordinate sits in the denominator, the 2D size of a projected object is inversely proportional to its 3D distance from the lens. The further away an object is, the smaller its footprint on the sensor becomes.
+
+Of course, this projection introduces a massive mathematical ambiguity. We are taking a 3D vector and compressing it into a 2D coordinate, destroying the explicit depth value. To perform a single-image 3D reconstruction, we must rely on powerful structural assumptions.
+
+Once again, we can look to the insights of Renaissance artists for a solution. Leonardo da Vinci established that to trick the human brain into seeing a realistic 3D space on a flat, 2D canvas, an artist must map out three architectural constraints:
+
+1. **Vanishing Points:** The singular points on a canvas where lines that are physically parallel in the 3D world converge.
+2. **Orthogonals:** The perspective lines drawn across a canvas that actively travel toward these vanishing points.
+3. **The Horizon Line:** The global eye-level line across the image where all parallel ground-plane vanishing points intersect.
+
+![[Pasted image 20260622102058.png]]
+
+By sketching these geometric guidelines first (as shown in the historical drawing above), artists anchors our biological depth cues. Let's look at the underlying mathematics that causes these convergence points to emerge.
+
+### Parallel Lines Under Perspective Projection
+
+To understand why lines converge, let’s track the perspective projection of a line in 3D space. Suppose we have a line pointing straight along the camera's optical axis ($Z$-axis), parameterized by a scalar distance variable $\alpha$:
+
+$$L(\alpha) = \begin{pmatrix} X_0 \\ Y_0 \\ Z_0 \end{pmatrix} + \alpha \begin{pmatrix} 0 \\ 0 \\ 1 \end{pmatrix}$$
+
+If we project this line onto our 2D image plane using our perspective formula, we get:
+
+$$l(\alpha) = \text{Proj}(L(\alpha)) = f \begin{pmatrix} \frac{X_0}{Z_0 + \alpha} \\ \frac{Y_0}{Z_0 + \alpha} \end{pmatrix}$$
+
+If we follow this line out toward infinity by evaluating the mathematical limit as $\alpha \to \infty$, the denominator grows infinitely large, causing the coordinates to shrink to zero:
+
+$$\lim_{\alpha \to \infty} l(\alpha) = \begin{pmatrix} 0 \\ 0 \end{pmatrix}$$
+
+Unlike orthographic projection (where parallel lines stay parallel), **perspective projection causes parallel lines to converge toward a definitive point on the screen.**
+
+To generalize this for _any_ arbitrary 3D line direction, let a line travel along a direction vector $(a, b, c)^T$:
+
+$$L(\alpha) = \begin{pmatrix} X_0 \\ Y_0 \\ Z_0 \end{pmatrix} + \alpha \begin{pmatrix} a \\ b \\ c \end{pmatrix}$$
+
+Projecting this general line yields:
+
+$$l(\alpha) = f \begin{pmatrix} \frac{X_0 + \alpha a}{Z_0 + \alpha c} \\ \frac{Y_0 + \alpha b}{Z_0 + \alpha c} \end{pmatrix}$$
+
+By evaluating the limit as $\alpha \to \infty$, the constant initial coordinates ($X_0, Y_0, Z_0$) become mathematically negligible. The $\alpha$ terms cancel out, leaving us with a fixed coordinate:
+
+$$\lim_{\alpha \to \infty} l(\alpha) = f \begin{pmatrix} \frac{a}{c} \\ \frac{b}{c} \end{pmatrix}$$
+
+This result proves that **every family of parallel lines sharing a direction vector where $c \neq 0$ will converge on the exact same 2D vanishing point** $(f\frac{a}{c}, f\frac{b}{c})^T$, regardless of their initial starting coordinates $(X_0, Y_0, Z_0)$.
+
+### The Manhattan World Assumption
+
+While classical artists manually constructed a few parallel lines, real-world structural environments (especially modern cities) are overflowing with them. This ecological regularity is formalized in computer vision as the **Manhattan World Assumption**.
+
+![[Pasted image 20260622103645.png]]
+
+This assumption states that the vast majority of lines in a human-made scene are oriented along one of three mutually orthogonal dominant axes in the 3D world: the $X$-axis, the $Y$-axis, or the $Z$-axis.
+
+Let's look at how this structure interacts with a camera:
+
+- If a camera is perfectly level relative to the scene (meaning the camera plane aligns perfectly with the building facades), the $X$ and $Y$ directional lines run perfectly parallel to the image sensor. Their depth direction component is zero ($c=0$), meaning their vanishing points sit at infinity.
+- The lines running down the street along the $Z$-axis, however, possess a non-zero $c$ component. They converge at a single, prominent vanishing point located directly at the center of the image.
+
+In the real world, a photographer rarely holds a camera perfectly level. The moment the camera tilts, rotates, or pitches, the $X$ and $Y$ structural lines are no longer parallel to the sensor plane. Their $c$ components become non-zero, causing them to project clean, measurable vanishing points onto the image. By tracking these vanishing points, a computer vision algorithm can compute the precise 3D rotation of the camera and back-calculate scene depth from a single photograph!
+
+## Summary
+
+
+- **Perspective Projection:** Maps a 3D point to a 2D image coordinate by dividing by its depth ($Z$). It is formalized mathematically by the non-linear relationship:$$\text{Proj}\begin{pmatrix} X \\ Y \\ Z \end{pmatrix} = f \begin{pmatrix} \frac{X}{Z} \\ \frac{Y}{Z} \end{pmatrix}$$
+- **Manhattan World Assumption:** Assumes that the structural elements of a scene are primarily organized along three mutually orthogonal geometric directions: $X$, $Y$, and $Z$.
+- **Single-Image Reconstruction:** If the Manhattan assumption holds true for a scene, calculating the number and exact coordinate locations of the resulting vanishing points provides enough geometric constraints to determine camera rotation and extract 3D form from a single 2D image.
+
+## Quiz
+
+### Question 1: Scale Changes under Perspective Distortion
+
+**Question:** (T/F) Under perspective projection, the image size of a car at a distance of 10 meters is twice the image size of the same car at 20 meters.
+
+#### Answer: TRUE
+
+- **Explanation:** This is a direct consequence of the perspective division rule. The projected 2D height of an object is calculated as $y = f\frac{Y}{Z}$, where $Y$ is the physical size and $Z$ is the distance.
+    
+    - At $Z = 10\text{m}$, the projected size is $y_{10} = f\frac{Y}{10}$.
+    - At $Z = 20\text{m}$, the projected size is $y_{20} = f\frac{Y}{20}$.
+    - Comparing the two: $y_{10} = 2 \cdot y_{20}$. Because the relationship with depth is inversely linear, halving the distance to the camera perfectly doubles the projected pixel size of the object.
+
+### Question 2: The Limits of Vanishing Points
+
+**Question:** (T/F) The maximum number of possible vanishing points in an image is 3.
+
+#### Answer: FALSE
+
+- **Explanation:** While the _Manhattan World Assumption_ restricts its focus to 3 dominant orthogonal directions (yielding up to 3 primary vanishing points), **a real-world image can contain an infinite number of vanishing points.** * Every single unique direction vector in the 3D world that is not parallel to the camera sensor plane ($c \neq 0$) will create its own independent vanishing point. If a scene contains a winding road, scattered objects rotated at various angles, or a fan of lines pointing in multiple directions, each individual direction will form its own distinct vanishing point on the screen.
+
+## Lecture 11: The Horizon Line & Camera Rotation
+
+### Camera Rotation Around the X-Axis (Pitch)
+
+Now that we understand how individual parallel lines project to a single vanishing point, let's look at how rotating our viewing instrument changes these projection points.
+
+Suppose we tilt the camera up or down by an angle $\theta$. This is a rotation around the camera's $X$-axis (often called camera pitch), defined by the standard 3D rotation matrix:
+
+$$M = \begin{pmatrix} 1 & 0 & 0 \\ 0 & \cos\theta & -\sin\theta \\ 0 & \sin\theta & \cos\theta \end{pmatrix}$$
+
+If we look at a line $L(\alpha)$ that was originally pointing straight down the world's longitudinal axis $(0,0,1)^T$, applying this camera rotation transforms the 3D line trajectory to:
+
+$$L(\alpha) = M \begin{pmatrix} X_0 \\ Y_0 \\ Z_0 \end{pmatrix} + \alpha M \begin{pmatrix} 0 \\ 0 \\ 1 \end{pmatrix}$$
+
+When we project this rotated line onto our 2D screen sensor and track its behavior out to infinity ($\alpha \to \infty$), the limits yield:
+
+$$l(\alpha) = \text{Proj}(L(\alpha)) = f \begin{pmatrix} \frac{X_1}{Z_1 + \alpha \cos\theta} \\ \frac{Y_1 - \alpha \sin\theta}{Z_1 + \alpha \cos\theta} \end{pmatrix} \xrightarrow{\alpha \to \infty} \begin{pmatrix} 0 \\ -f \tan\theta \end{pmatrix}$$
+
+![[Pasted image 20260622110031.png]]
+
+This proves that tilting the camera up or down shifts the vanishing point along the $y$-axis of your image by exactly $-f \tan\theta$.
+
+Intuitively, no matter how we translate the camera left, right, up, or down within that landscape, the global convergence zone stays locked to this same height relative to the image frame. To generalize this structural phenomenon, we introduce a powerful new environmental constraint.
+
+### The Ground Plane Assumption
+
+To model scenes that feature a clear sky-to-earth transition, we rely on the **Ground Plane Assumption**. This constraint assumes that the physical scene contains a massive, flat reference plane representing the floor or ground, defined by a constant vertical height boundary:
+
+$$Y = Y_0$$
+
+Let's look at how a flat surface plane $P(\alpha, \beta)$ parameterized by horizontal spatial variables $\alpha$ and $\beta$ projects under standard perspective conditions:
+
+$$P(\alpha, \beta) = \begin{pmatrix} X_0 \\ Y_0 \\ Z_0 \end{pmatrix} + \begin{pmatrix} \alpha \\ 0 \\ \beta \end{pmatrix}$$
+
+Projecting this plane grid yields:
+
+$$p(\alpha, \beta) = \text{Proj}(P(\alpha, \beta)) = f \begin{pmatrix} \frac{X_0 + \alpha}{Z_0 + \beta} \\ \frac{Y_0}{Z_0 + \beta} \end{pmatrix}$$
+
+If we look out toward the infinitely distant edge of this plane by letting $\beta \to \infty$ (moving toward the horizon), the coordinates converge:
+
+$$\lim_{\beta \to \infty} p(\alpha, \beta) = \begin{pmatrix} f \frac{\alpha}{\beta} \\ 0 \end{pmatrix}$$
+
+Because $\frac{\alpha}{\beta}$ can evaluate to any horizontal coordinate along the screen depending on the path taken, the $y$-coordinate stays perfectly locked at $0$. This means that **all planes of the form $Y = Y_0$ converge onto a single horizontal line across the image.** This boundary is what we call the **Horizon Line**.
+
+### Estimating Camera Rotation and Object Depth
+
+What happens to this entire ground plane when our camera tilts around the $X$-axis by an angle $\theta$? We apply our rotation matrix $M$ to the plane parameters:
+
+$$P(\alpha, \beta) = M \begin{pmatrix} X_0 \\ Y_0 \\ Z_0 \end{pmatrix} + M \begin{pmatrix} \alpha \\ 0 \\ \beta \end{pmatrix}$$
+
+Evaluating the perspective projection limit as we travel out toward infinity ($\beta \to \infty$) yields:
+
+$$\lim_{\beta \to \infty} p(\alpha, \beta) = \begin{pmatrix} f \frac{\alpha}{\beta} \\ -f \tan\theta \end{pmatrix}$$
+
+Notice that the vertical position of the entire horizon line sits exactly at $y = -f \tan\theta$, which matches our longitudinal vanishing point coordinate!
+
+Therefore, **by locating the horizon line in a single image, we can directly back-calculate the exact pitch rotation angle ($\theta$) of the camera.**
+
+#### Can We Also Compute Absolute 3D Depth ($Z$)?
+
+Yes! If an object is resting flat on the ground plane, we know its true height coordinate is fixed at $Y_0$. Projecting this ground object onto our screen yields a vertical pixel coordinate $y$:
+
+$$y = f \frac{Y_0}{Z}$$
+
+By rewriting this equation to isolate our depth variable, we get an elegant, direct translation from 2D pixel height to 3D distance:
+
+$$Z = f \frac{Y_0}{y}$$
+
+This is a profound computational insight: **The vertical distance from an object's base to the horizon line ($y$) completely determines its absolute 3D depth ($Z$) from the camera lens.**
+
+## Summary
+
+
+- **Ground Plane Assumption:** Assumes that the environmental layout contains a dominant flat surface plane defined mathematically by the constant vertical coordinate $Y = Y_0$.
+- **The Horizon Line:** Defined as the shared convergence line in the 2D image plane where all parallel 3D planes of the form $Y = Y_0$ intersect at infinity.
+- **Geometric Inference:** Finding the horizon line provides enough geometric constraints to compute the camera's pitch rotation around the $X$-axis and determine the absolute 3D depth distance ($Z$) to any object sitting on the ground plane.
+
+## Quiz
+
+### Question 1: Rotational Effects on the Horizon
+
+**Question:** (T/F) Rotating the camera around the $Z$-axis will move the horizon line up and down.
+
+#### Answer: FALSE
+
+- **Explanation:** Rotating a camera around its $Z$-axis represents a **roll** rotation (like tilting your head side-to-side or rotating a steering wheel).
+    - Tilting the camera side-to-side does not move the horizon line up or down along the frame. Instead, it **rotates (tilts) the horizon line** across the screen, changing its slope.
+    - To move the horizon line vertically up or down within the frame, you must rotate the camera around its **$X$-axis** (pitching the camera up or down).
+
+### Question 2: The Height-to-Depth Relationship
+
+**Question:** (T/F) For a scene that satisfies the ground plane assumption, the higher the object is, the further it is from the camera.
+
+#### Answer: TRUE (Assuming the object rests on the ground below eye-level)
+
+- **Explanation:** Let's look at our depth equation: $Z = f \frac{Y_0}{y}$.
+    - For an observer standing up, the ground plane sits below the camera eye-level, meaning $Y_0$ is a constant negative value, and its projection appears in the bottom half of the image ($y < 0$).
+    - As an object moves further away into the distance ($Z \to \infty$), its vertical position $y$ must shrink toward $0$ to satisfy the equation.
+    - Moving toward $0$ from the bottom of the screen means the object's pixel location **rises higher up in the image**, creeping closer to the horizon line. Therefore, an object that appears higher up on the ground track is physically further away from your lens.
+
