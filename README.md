@@ -26,7 +26,7 @@ The summary synthesizes mathematical foundations, biological neural mechanisms, 
 
 ## 📂 File Access
 
-* [📥 Download / View Course Summary PDF](./Human_Vision_Course_Summary.pdf) *(Note: Replace with your exact PDF filename)*
+* [📥 Download / View Course Summary PDF](./HVCA_76921.pdf) *(Note: Replace with your exact PDF filename)*
 
 ---
 
